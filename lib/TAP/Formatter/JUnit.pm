@@ -7,7 +7,7 @@ use TAP::Formatter::JUnit::Session;
 use base qw(TAP::Formatter::Console);
 use Class::Field qw(field);
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 field 'testsuites'  => [];
 
@@ -152,6 +152,10 @@ Graham TerMarsch <cpan@howlingfrog.com>
 
 Many thanks to Andy Armstrong et al. for the B<fabulous> set of tests in
 C<Test::Harness>; they became the basis for the unit tests here.
+
+Other thanks go out to those that have provided feedback, comments, or patches:
+
+  Mark Aufflick
 
 =head1 COPYRIGHT
 
