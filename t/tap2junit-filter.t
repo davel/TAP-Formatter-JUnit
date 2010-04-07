@@ -6,12 +6,15 @@ use Test::More tests => 2;
 use Test::Differences;
 use IPC::Open2 qw(open2);
 use File::Slurp qw(slurp);
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use TestLib;
 
 ###############################################################################
 # TEST: Run "tap2junit" in filter mode (in STDIN, out STDOUT)
 tap2junit_filter: {
     my $tap = slurp('t/data/tap/simple');
-    my $xml = slurp('t/data/tap/junit/simple');
+    my $xml = TestLib::smash( scalar slurp('t/data/tap/junit/simple') );
 
     my ($chld_in, $chld_out);
     my $pid = open2($chld_out, $chld_in,
@@ -22,6 +25,7 @@ tap2junit_filter: {
     print $chld_in $tap;
     close $chld_in;
 
-    my $received = do { local $/; <$chld_out> };
+    my $received = TestLib::smash( scalar do { local $/; <$chld_out> } );
+
     eq_or_diff $received, $xml, 'results generated on STDOUT';
 }
