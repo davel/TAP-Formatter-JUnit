@@ -11,7 +11,7 @@ our $VERSION = '0.03';
 has testsuites => (
     isa => 'ArrayRef',
     is => 'rw',
-    default => sub { warn "starting up"; return []; },
+    default => sub { return []; },
     traits => [qw/Array/],
     handles => {
         add_testsuite => 'push'
@@ -62,7 +62,7 @@ sub summary {
 sub xml {
     my $self = shift;
     unless ($self->{xml}) {
-        $self->{xml} = XML::Generator->new(':pretty', ':std', 'encoding'=>'UTF-8');
+        $self->{xml} = XML::Generator->new(':std', 'encoding'=>'UTF-8');
     }
     return $self->{xml};
 }
