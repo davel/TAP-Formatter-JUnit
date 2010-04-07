@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 14;
+use Test::More tests => 9;
 use TAP::Harness;
 use IO::Scalar;
 
