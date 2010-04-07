@@ -1,16 +1,30 @@
 package TAP::Formatter::JUnit::Session;
 
-use strict;
-use warnings;
-use base qw(TAP::Formatter::Console::Session);
-use Class::Field qw(field);
+use Moose;
+extends qw(TAP::Formatter::Console::Session Moose::Object);
 use Storable qw(dclone);
 use File::Path qw(mkpath);
 use IO::File;
 
-field 'testcases'   => [];
-field 'system_out'  => '';
-field 'system_err'  => '';
+has testcases => (
+    is => 'rw',
+    isa => 'ArrayRef',
+    default => sub { []; },
+    traits => [qw/Array/],
+    handles => {
+        add_testcase => 'push'
+    },
+);
+has system_out => ( is => 'rw', isa => 'Str', default => '' );
+has system_err => ( is => 'rw', isa => 'Str', default => '' );
+
+sub new {
+    my $class = shift;
+    my $obj = $class->SUPER::new(@_);
+    return $class->meta->new_object(
+        __INSTANCE__ => $obj, # @_
+    );
+}
 
 ###############################################################################
 # Subroutine:   result($result)
@@ -137,15 +151,6 @@ sub dump_junit_xml {
         $fout->print($junit);
         $fout->close();
     }
-}
-
-###############################################################################
-# Subroutine:   add_testcase($case)
-###############################################################################
-# Adds an XML test '$case' to the list of testcases we've run in this session.
-sub add_testcase {
-    my ($self, $case) = @_;
-    push @{$self->{testcases}}, $case;
 }
 
 ###############################################################################

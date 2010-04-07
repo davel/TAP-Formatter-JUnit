@@ -1,15 +1,30 @@
 package TAP::Formatter::JUnit;
 
-use strict;
-use warnings;
+use Moose;
 use XML::Generator;
 use TAP::Formatter::JUnit::Session;
-use base qw(TAP::Formatter::Console);
-use Class::Field qw(field);
+extends qw(TAP::Formatter::Console Moose::Object);
+use Data::Dumper;
 
 our $VERSION = '0.03';
 
-field 'testsuites'  => [];
+has testsuites => (
+    isa => 'ArrayRef',
+    is => 'rw',
+    default => sub { warn "starting up"; return []; },
+    traits => [qw/Array/],
+    handles => {
+        add_testsuite => 'push'
+    },
+);
+
+sub new {
+    my $class = shift;
+    my $obj = $class->SUPER::new(@_);
+    return $class->meta->new_object(
+        __INSTANCE__ => $obj, # @_
+    );
+}
 
 ###############################################################################
 # Subroutine:   open_test($test, $parser)
@@ -62,16 +77,6 @@ sub xml_unescape {
         $self->{xml_unescape} = XML::Generator->new(':pretty', ':std', 'escape'=>'unescaped', 'encoding'=>'UTF-8');
     }
     return $self->{xml_unescape};
-}
-
-###############################################################################
-# Subroutine:   add_testsuite($suite)
-###############################################################################
-# Adds the given XML test '$suite' to the list of test suites that we've
-# executed and need to summarize.
-sub add_testsuite {
-    my ($self, $suite) = @_;
-    push @{$self->testsuites}, $suite;
 }
 
 1;
