@@ -17,12 +17,18 @@ has testcases => (
 );
 has system_out => ( is => 'rw', isa => 'Str', default => '' );
 has system_err => ( is => 'rw', isa => 'Str', default => '' );
+has passing_todo_ok => ( is => 'rw', isa => 'Bool', default => 0 );
 
 sub new {
     my $class = shift;
-    my $obj = $class->SUPER::new(@_);
+
+    my %args = %{$_[0]};
+    my %_args = %args;
+    delete $args{passing_todo_ok};
+
+    my $obj = $class->SUPER::new(\%args);
     return $class->meta->new_object(
-        __INSTANCE__ => $obj, # @_
+        __INSTANCE__ => $obj, %_args
     );
 }
 
@@ -40,9 +46,6 @@ sub result {
     # add the raw output
     $self->{system_out} .= $result->raw() . "\n";
 
-    # skip "plan"; no equivalent in JUnit
-    return if ($result->is_plan);
-
     # when we get the next test process the previous one
     $self->_flush_queue if ($result->is_test && $self->{_junit_queue});
 
@@ -53,6 +56,12 @@ sub result {
              || ($result->raw() =~ /^# Looks like your test died before it could output anything/)
            ) {
         push @{$self->{_junit_queue} ||= []}, $result;
+    }
+
+    # track the last time we saw a test/plan, so we can calculate how long it
+    # takes to run individual tests.
+    if ($result->is_test || $result->is_plan) {
+        $self->{_junit_t_last_test} = $self->get_time();
     }
 }
 
@@ -108,7 +117,8 @@ sub close_test {
     my $planned  = $parser->tests_planned() || 0;
     my $bad_exit = $parser->exit() ? 1 : 0;
 
-    my $errors   = $parser->todo_passed();
+    my $errors   = 0;
+    $errors += $parser->todo_passed() unless $self->passing_todo_ok();
     $errors += abs($testsrun - $planned) if ($planned);
     $errors += ($noplan || $bad_exit);
 
@@ -190,8 +200,9 @@ sub _time_since_last_test {
     my $t_st = $self->{_junit_t_last_test} || $self->parser->start_time();
     my $t_en = $self->get_time();
     my $diff = $t_en - $t_st;
-    $self->{_junit_t_last_test} = $t_en;
-    return $diff;
+    my $ret  = $self->{_junit_t_since_last_test} || 0;
+    $self->{_junit_t_since_last_test} = $diff;
+    return $ret;
 }
 
 ###############################################################################
@@ -231,7 +242,7 @@ sub _flush_item {
 
         # check for bogosity
         my $bogosity;
-        if ($result->todo_passed()) {
+        if ($result->todo_passed() && !$self->passing_todo_ok()) {
             $bogosity = {
                 level   => 'error',
                 type    => 'TodoTestSucceeded',
@@ -270,6 +281,10 @@ sub _flush_item {
     }
     else {
         # some sort of non-test output; ignore for now.
+        #
+        # we do, however, need to track the time since the last test, so that
+        # timings get calculated properly
+        $self->_time_since_last_test();
     }
 }
 
@@ -306,16 +321,27 @@ sub _clean_to_java_class_name {
 sub _clean_test_description {
     my $test = shift;
     my $desc = $test->description();
-    $desc =~ s/\000//g;     # NULLs aren't valid in test description
-    return $desc;
+    return _squeaky_clean($desc);
 }
 
 ###############################################################################
-# Creates a CDATA block for the given data.
+# Creates a CDATA block for the given data (which is made squeaky clean first,
+# so that JUnit parsers like Hudson's don't choke).
 sub _cdata {
     my ($self, $data) = @_;
-    $data =~ s/\000//g;     # NULLs aren't valid in a CDATA section
+    $data = _squeaky_clean($data);
     return $self->xml->xmlcdata($data);
+}
+
+###############################################################################
+# Clean a string to the point that JUnit can't possibly have a problem with it.
+sub _squeaky_clean {
+    my $string = shift;
+    # control characters (except CR and LF)
+    $string =~ s/([\x00-\x09\x0b\x0c\x0e-\x1f])/"^".chr(ord($1)+64)/ge;
+    # high-byte characters
+    $string =~ s/([\x7f-\xff])/'[\\x'.sprintf('%02x',ord($1)).']'/ge;
+    return $string;
 }
 
 1;
@@ -332,6 +358,11 @@ C<TAP::Harness>.
 =head1 METHODS
 
 =over
+
+=item B<_initialize($arg_for)>
+
+Over-ridden private initializer, so we can accept a new "passing_todo_ok"
+argument at instantiation time.
 
 =item B<result($result)>
 
