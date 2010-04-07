@@ -6,7 +6,9 @@ use Test::More;
 use Test::Differences;
 use File::Slurp qw(slurp);
 use App::Prove 3.12;
-use File::Temp qw/tempfile/;
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use TestLib;
 
 ###############################################################################
 # Figure out how many tests we have to run.
@@ -22,26 +24,10 @@ plan tests => scalar(@tests);
 foreach my $test (@tests) {
     (my $junit = $test) =~ s{/tests/}{/tests/junit/};
 
-    my $received = smash(scalar `$^X t/bin/my-prove --formatter TAP::Formatter::JUnit --merge $test`);
-    my $expected = smash(scalar slurp($junit));
+    my $received = TestLib::smash(scalar `$^X t/bin/my-prove --formatter TAP::Formatter::JUnit --merge $test`);
+    my $expected = TestLib::smash(scalar slurp($junit));
 
     eq_or_diff $received, $expected, $test;
 }
 
-# Squash all the XML with xmllint, in an attempt to make diffs sane.
 
-sub smash {
-    my ($data) = @_;
-
-    my ($fh, $fn) = tempfile( SUFFIX => '.xml', UNLINK => 1 );
-    print $fh $data;
-    close $fh;
-
-    open(my $lint, '-|', 'xmllint', '--format', $fn) or die $!;
-    my $ret = slurp($lint);
-
-    if ($ret eq '') {
-        return $data;
-    }
-    return $ret;
-}

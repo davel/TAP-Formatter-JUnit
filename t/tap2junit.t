@@ -5,7 +5,9 @@ use warnings;
 use Test::More;
 use Test::Differences;
 use File::Slurp qw(slurp);
-use File::Temp qw/tempfile/;
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use TestLib;
 
 ###############################################################################
 # Figure out how many TAP files we have to run.  Yes, the results *ARE* going
@@ -23,28 +25,11 @@ foreach my $test (@tests) {
     my $rc = system(qq{ $^X -Ilib bin/tap2junit $test 2>/dev/null });
 
     my $outfile  = "$test.xml";
-    my $received = smash(scalar slurp($outfile));
+    my $received = TestLib::smash(scalar slurp($outfile));
     unlink $outfile;
 
-    my $expected = smash(scalar slurp($junit));
+    my $expected = TestLib::smash(scalar slurp($junit));
 
     eq_or_diff $received, $expected, $test;
 }
 
-# Squash all the XML with xmllint, in an attempt to make diffs sane.
-
-sub smash {
-    my ($data) = @_;
-
-    my ($fh, $fn) = tempfile( SUFFIX => '.xml', UNLINK => 1 );
-    print $fh $data;
-    close $fh;
-
-    open(my $lint, '-|', 'xmllint', '--format', $fn) or die $!;
-    my $ret = slurp($lint);
-
-    if ($ret eq '') {
-        return $data;
-    }
-    return $ret;
-}
